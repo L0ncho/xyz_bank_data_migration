@@ -1,0 +1,28 @@
+spring:
+  application:
+    name: xyz-bank-data-migration
+  datasource:
+    url: jdbc:h2:mem:batchdb;DB_CLOSE_DELAY=-1
+    driver-class-name: org.h2.Driver
+    username: sa
+    password:
+  batch:
+    jdbc:
+      initialize-schema: always
+    job:
+      enabled: false
+  h2:
+    console:
+      enabled: false
+
+migration:
+  data:
+    daily-transactions: file:data/semana_1/transacciones.csv
+    monthly-interests: file:data/semana_1/intereses.csv
+    annual-accounts: file:data/semana_1/cuentas_anuales.csv
+
+logging:
+  level:
+    root: INFO
+    com.xyzbank.migration: INFO
+    org.springframework.batch: INFO
