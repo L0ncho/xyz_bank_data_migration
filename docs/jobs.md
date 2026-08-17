@@ -78,7 +78,7 @@ flowchart LR
     writer --> table[(annual_audit_reports)]
 ```
 
-El writer consolida por `cuenta_id` vía `AnnualAccountCompiler`.
+El writer Batch acumula movimientos de todos los chunks del step y consolida por `cuenta_id` vía `AnnualAccountCompiler` al cerrar el step (un resumen por cuenta sobre todo el archivo).
 
 ## Skip / retry
 

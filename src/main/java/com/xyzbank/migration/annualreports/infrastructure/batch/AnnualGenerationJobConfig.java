@@ -57,6 +57,7 @@ public class AnnualGenerationJobConfig {
     }
 
     @Bean
+    @StepScope
     public AnnualAuditItemWriter annualAuditItemWriter(AnnualAuditWriter annualAuditWriter) {
         return new AnnualAuditItemWriter(annualAuditWriter);
     }
