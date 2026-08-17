@@ -1,8 +1,10 @@
 package com.xyzbank.migration.dailytransactions.infrastructure.batch;
 
 import com.xyzbank.migration.dailytransactions.application.ports.InMemoryDailyReportWriter;
-import com.xyzbank.migration.dailytransactions.domain.AnomalyDetector;
 import com.xyzbank.migration.dailytransactions.domain.ProcessedTransaction;
+import com.xyzbank.migration.shared.application.ports.InMemoryMigrationExecutionPort;
+import com.xyzbank.migration.shared.infrastructure.batch.MigrationGuardTasklet;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.batch.core.BatchStatus;
 import org.springframework.batch.core.Job;
@@ -32,6 +34,7 @@ class TheDailyTransactionsJobTest {
     /*
      * Cases:
      * 1. Writes valid transactions and omits invalid ones
+     * 2. Omits processing when migration already succeeded
      */
 
     @Autowired
@@ -43,6 +46,14 @@ class TheDailyTransactionsJobTest {
 
     @Autowired
     private InMemoryDailyReportWriter dailyReportWriter;
+
+    @Autowired
+    private InMemoryMigrationExecutionPort migrationExecutionPort;
+
+    @BeforeEach
+    void resetMigrationLedger() {
+        migrationExecutionPort.clear();
+    }
 
     @Test
     void writesValidTransactionsAndOmitsInvalidOnes() throws Exception {
@@ -57,6 +68,25 @@ class TheDailyTransactionsJobTest {
         assertEquals(BatchStatus.COMPLETED, execution.getStatus());
         assertEquals(7, dailyReportWriter.written().size());
         assertTrue(dailyReportWriter.written().stream().anyMatch(ProcessedTransaction::hasAnomaly));
+        assertTrue(migrationExecutionPort.hasSuccessfulExecution("dailyTransactionsJob"));
+    }
+
+    @Test
+    void omitsProcessingWhenMigrationAlreadySucceeded() throws Exception {
+        migrationExecutionPort.markSuccess("dailyTransactionsJob", 7, 3);
+        jobLauncherTestUtils.setJob(dailyTransactionsJob);
+        int writtenBefore = dailyReportWriter.written().size();
+
+        JobExecution execution = jobLauncherTestUtils.launchJob(
+                new JobParametersBuilder()
+                        .addLong("run.id", System.currentTimeMillis() + 1)
+                        .toJobParameters()
+        );
+
+        assertEquals(BatchStatus.COMPLETED, execution.getStatus());
+        assertEquals(writtenBefore, dailyReportWriter.written().size());
+        assertTrue(execution.getStepExecutions().stream().anyMatch(step ->
+                MigrationGuardTasklet.alreadyMigratedExitCode.equals(step.getExitStatus().getExitCode())));
     }
 
     @TestConfiguration
@@ -70,8 +100,8 @@ class TheDailyTransactionsJobTest {
 
         @Bean
         @Primary
-        AnomalyDetector anomalyDetector() {
-            return new AnomalyDetector();
+        InMemoryMigrationExecutionPort migrationExecutionPort() {
+            return new InMemoryMigrationExecutionPort();
         }
     }
 }

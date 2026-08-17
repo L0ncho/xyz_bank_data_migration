@@ -2,17 +2,17 @@ spring:
   application:
     name: xyz-bank-data-migration
   datasource:
-    url: jdbc:h2:mem:batchdb;DB_CLOSE_DELAY=-1
-    driver-class-name: org.h2.Driver
-    username: sa
-    password:
+    url: jdbc:mysql://localhost:3306/xyz_bank_migration
+    username: migration
+    password: migration
+    driver-class-name: com.mysql.cj.jdbc.Driver
+  sql:
+    init:
+      mode: never
   batch:
     jdbc:
       initialize-schema: always
     job:
-      enabled: false
-  h2:
-    console:
       enabled: false
 
 migration:

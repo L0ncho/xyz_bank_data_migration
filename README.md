@@ -1,70 +1,77 @@
 # XYZ Bank Data Migration
 
-Migración de datos bancarios con **Spring Boot 3.5** y **Spring Batch 5**. Procesa los CSV de `data/semana_1` mediante tres jobs independientes, cada uno con un único step chunk-oriented (`ItemReader` → `ItemProcessor` → `ItemWriter`).
+Migración de datos bancarios con **Spring Boot 3.5** y **Spring Batch 5**. Procesa los CSV de `data/semana_1` mediante tres jobs independientes (Reader → Processor → Writer), con persistencia JDBC en **MySQL**.
 
-La escritura a base relacional queda para la **Fase 2**. En esta fase los puertos de escritura se implementan con adapters de logging (consola).
+Documentación ampliada:
+
+- [docs/jobs.md](docs/jobs.md) — diagramas y flujo de cada job
+- [docs/mysql.md](docs/mysql.md) — Docker MySQL, conexión y consultas de reportes
 
 ## Stack
 
 | Tecnología | Uso |
 |---|---|
 | Java 17+ | Lenguaje |
-| Spring Boot 3.5 | Bootstrap y auto-configuración |
+| Spring Boot 3.5 | Bootstrap |
 | Spring Batch 5 | Jobs, steps, skip/retry |
-| H2 | Solo metadatos del `JobRepository` (no datos de negocio) |
+| MySQL 8.4 | Datos de negocio + JobRepository Batch |
+| Docker Compose | MySQL local |
 | Maven | Build y ejecución |
 
 ## Arquitectura
 
-Hexagonal por módulo de negocio. El dominio no depende de Spring. Batch vive en infraestructura.
+Hexagonal por módulo. Dominio sin Spring. Batch e adapters JDBC en infraestructura.
 
 ```
 src/main/java/com/xyzbank/migration/
-├── BatchApplication.java
 ├── shared/
-│   ├── domain/                 DomainError, Id, Money, BusinessDate
-│   └── infrastructure/batch/   JobSummaryListener, LoggingSkipListener
+│   ├── application/ports/      MigrationExecutionPort
+│   └── infrastructure/
+│       ├── adapters/           JdbcMigrationExecutionAdapter
+│       └── batch/              Guard, LedgerListener, summary
 ├── dailytransactions/
-│   ├── domain/
-│   ├── application/ports/      DailyReportWriter (+ InMemory)
-│   └── infrastructure/batch/   dailyTransactionsJob
-├── monthlyinterests/
-│   ├── domain/
-│   ├── application/ports/      AccountBalanceWriter (+ InMemory)
-│   └── infrastructure/batch/   monthlyInterestsJob
-└── annualreports/
-    ├── domain/
-    ├── application/ports/      AnnualAuditWriter (+ InMemory)
-    └── infrastructure/batch/   annualGenerationJob
+│   ├── application/ports/      DailyReportWriter
+│   └── infrastructure/
+│       ├── adapters/           JdbcDailyReportWriter
+│       └── batch/              dailyTransactionsJob
+├── monthlyinterests/ ...       AccountBalanceWriter → JdbcAccountBalanceWriter
+└── annualreports/ ...          AnnualAuditWriter → JdbcAnnualAuditWriter
 ```
 
-```
-JobLauncher
-    └── Job (proceso de migración)
-            └── Step (fase única)
-                    ├── ItemReader   lee CSV
-                    ├── ItemProcessor valida y transforma (dominio)
-                    └── ItemWriter   escribe vía Puerto
-JobRepository (H2) ← estado de ejecución
-```
+## Jobs (resumen)
 
-## Jobs
+| Job | Guard | Process | Tabla MySQL |
+|---|---|---|---|
+| `dailyTransactionsJob` | `checkDailyMigrationNotDone` | `processDailyTransactions` | `daily_transaction_reports` |
+| `monthlyInterestsJob` | `checkMonthlyMigrationNotDone` | `calculateMonthlyInterests` | `account_balances` |
+| `annualGenerationJob` | `checkAnnualMigrationNotDone` | `compileAnnualAudit` | `annual_audit_reports` |
 
-### 1. `dailyTransactionsJob`
+Si el job ya tiene `SUCCESS` en `migration_executions`, se omite el process (`ALREADY_MIGRATED`). Cada lanzamiento usa `RunIdIncrementer` para crear una nueva instancia Batch y consultar el ledger. Detalle en [docs/jobs.md](docs/jobs.md).
 
-- **CSV:** `data/semana_1/transacciones.csv`
-- **Step:** `processDailyTransactions`
-- **Procesa:** transacciones diarias, detecta anomalías (monto > 2000, duplicados) y genera resumen
-- **Puerto:** `DailyReportWriter` → `LoggingDailyReportWriter`
+## Reglas de negocio
 
-### 2. `monthlyInterestsJob`
+### Transacciones diarias
 
-- **CSV:** `data/semana_1/intereses.csv`
-- **Step:** `calculateMonthlyInterests`
-- **Procesa:** aplica intereses individuales y actualiza saldo final
-- **Puerto:** `AccountBalanceWriter` → `LoggingAccountBalanceWriter`
+Se omiten (`skip`) registros con:
 
-Tasas inferidas por cuenta:
+- `monto <= 0`
+- tipo inválido
+- campos obligatorios nulos
+- duplicados por `fecha + monto + tipo`
+
+Las anomalías (monto alto, duplicados detectados) se registran en el reporte sin bloquear la escritura cuando el registro es válido.
+
+### Intereses mensuales
+
+Se omiten registros con:
+
+- `saldo <= 0`
+- edad fuera del rango 18–100
+- tipo inválido
+- campos nulos
+- `cuenta_id` duplicado
+
+Tasas inferidas:
 
 | Tipo | Condición | Tasa |
 |---|---|---|
@@ -73,58 +80,60 @@ Tasas inferidas por cuenta:
 | prestamo | — | 1.50% |
 | hipoteca | — | 0.80% |
 
-`saldoFinal = saldo × (1 + tasa)`
+### Auditoría anual
 
-### 3. `annualGenerationJob`
+Se omiten registros con:
 
-- **CSV:** `data/semana_1/cuentas_anuales.csv`
-- **Step:** `compileAnnualAudit`
-- **Procesa:** valida movimientos y consolida por `cuenta_id` el reporte de auditoría
-- **Puerto:** `AnnualAuditWriter` → `LoggingAnnualAuditWriter`
+- depósito con `monto == 0`
+- tipo inválido
+- campos nulos
+- duplicados
 
-## Políticas skip / retry
-
-**Normalización (no skip):** fecha `yyyy/MM/dd` → `yyyy-MM-dd`; trim de strings.
-
-**Skip** (`DomainError` / `FlatFileParseException`, `skipLimit=100`):
-
-- Transacciones: `monto <= 0`, tipo inválido, campos obligatorios nulos, duplicados (fecha+monto+tipo)
-- Intereses: `saldo <= 0`, edad fuera de 18–100, tipo inválido, campos nulos, `cuenta_id` duplicado
-- Anual: depósito con `monto == 0`, tipo inválido, campos nulos, duplicados; retiro/compra negativos son válidos
-
-**Retry:** 3 intentos solo para errores técnicos del writer (`TransientDataAccessException`).
-
-Los processors stateful usan `processorNonTransactional()` para no reprocesar ítems válidos tras un skip en el chunk.
+Los retiros/compras con montos negativos son válidos. El writer consolida por `cuenta_id`.
 
 ## Cómo ejecutar
 
-Requisitos: JDK 17+ y Maven.
+### 1. Levantar MySQL
 
 ```bash
-# Tests
-mvn test
+docker compose up -d
+```
 
-# Job de transacciones diarias
+Conexión: `localhost:3306`, DB `xyz_bank_migration`, user/password `migration`/`migration`. Más detalle en [docs/mysql.md](docs/mysql.md).
+
+### 2. Tests
+
+```bash
+mvn test
+```
+
+### 3. Correr un job
+
+```bash
 mvn spring-boot:run -Dspring-boot.run.arguments="--spring.batch.job.enabled=true --spring.batch.job.name=dailyTransactionsJob"
 
-# Job de intereses mensuales
 mvn spring-boot:run -Dspring-boot.run.arguments="--spring.batch.job.enabled=true --spring.batch.job.name=monthlyInterestsJob"
 
-# Job de consolidado anual
 mvn spring-boot:run -Dspring-boot.run.arguments="--spring.batch.job.enabled=true --spring.batch.job.name=annualGenerationJob"
 ```
 
-Por defecto `spring.batch.job.enabled=false` para no lanzar los tres jobs a la vez.
+Por defecto `spring.batch.job.enabled=false`.
 
-## Fase 2 (pendiente)
+### 4. Ver reportes migrados
 
-Reemplazar los adapters `Logging*Writer` por implementaciones JDBC de los mismos puertos:
+```bash
+docker compose exec mysql mysql -umigration -pmigration xyz_bank_migration -e "SELECT * FROM migration_executions; SELECT * FROM daily_transaction_reports LIMIT 10;"
+```
 
-- `DailyReportWriter`
-- `AccountBalanceWriter`
-- `AnnualAuditWriter`
+Consultas adicionales en [docs/mysql.md](docs/mysql.md).
 
-Sin cambios en dominio ni en la definición de los jobs.
+## Revertir y volver a migrar
+
+```bash
+docker compose exec -T mysql mysql -umigration -pmigration xyz_bank_migration < scripts/revert-migration.sql
+```
+
+Luego vuelve a ejecutar el job deseado. El script limpia tablas de negocio, `migration_executions` y metadatos `BATCH_*`.
 
 ## Datos de entrada
 

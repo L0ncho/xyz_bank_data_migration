@@ -1,6 +1,7 @@
 package com.xyzbank.migration.monthlyinterests.infrastructure.batch;
 
 import com.xyzbank.migration.monthlyinterests.application.ports.InMemoryAccountBalanceWriter;
+import com.xyzbank.migration.shared.application.ports.InMemoryMigrationExecutionPort;
 import org.junit.jupiter.api.Test;
 import org.springframework.batch.core.BatchStatus;
 import org.springframework.batch.core.Job;
@@ -67,8 +68,8 @@ class TheMonthlyInterestsJobTest {
 
         @Bean
         @Primary
-        MonthlyInterestProcessor monthlyInterestProcessor() {
-            return new MonthlyInterestProcessor();
+        InMemoryMigrationExecutionPort migrationExecutionPort() {
+            return new InMemoryMigrationExecutionPort();
         }
     }
 }

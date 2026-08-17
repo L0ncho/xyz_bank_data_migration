@@ -38,6 +38,10 @@ public final class InterestApplied {
         return account.type();
     }
 
+    public int accountAge() {
+        return account.age();
+    }
+
     public double previousBalanceValue() {
         return account.balance().amount();
     }

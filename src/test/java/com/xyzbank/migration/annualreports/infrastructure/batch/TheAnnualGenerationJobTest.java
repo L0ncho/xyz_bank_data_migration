@@ -1,6 +1,7 @@
 package com.xyzbank.migration.annualreports.infrastructure.batch;
 
 import com.xyzbank.migration.annualreports.application.ports.InMemoryAnnualAuditWriter;
+import com.xyzbank.migration.shared.application.ports.InMemoryMigrationExecutionPort;
 import org.junit.jupiter.api.Test;
 import org.springframework.batch.core.BatchStatus;
 import org.springframework.batch.core.Job;
@@ -67,8 +68,8 @@ class TheAnnualGenerationJobTest {
 
         @Bean
         @Primary
-        AnnualMovementProcessor annualMovementProcessor() {
-            return new AnnualMovementProcessor();
+        InMemoryMigrationExecutionPort migrationExecutionPort() {
+            return new InMemoryMigrationExecutionPort();
         }
     }
 }
