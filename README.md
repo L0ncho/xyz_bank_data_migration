@@ -16,7 +16,7 @@ Documentación ampliada:
 | Spring Batch 5 | Jobs, steps, skip/retry |
 | MySQL 8.4 | Datos de negocio + JobRepository Batch |
 | Docker Compose | MySQL local |
-| Maven | Build y ejecución |
+| Maven Wrapper | Build y ejecución |
 
 ## Arquitectura
 
@@ -91,6 +91,14 @@ Se omiten registros con:
 
 Los retiros/compras con montos negativos son válidos. El writer consolida por `cuenta_id`.
 
+## Requisitos previos
+
+Para poder ejecutar el proyecto necesitas tener instalado:
+- **JDK 17+** (configurado en el `PATH` o mediante `JAVA_HOME`).
+- **Docker** y **Docker Compose** (para levantar la base de datos MySQL local).
+
+*Nota: No es necesario tener Maven instalado de forma global, ya que el proyecto incluye **Maven Wrapper** (`mvnw` / `mvnw.cmd`).*
+
 ## Cómo ejecutar
 
 ### 1. Levantar MySQL
@@ -104,17 +112,25 @@ Conexión: `localhost:3306`, DB `xyz_bank_migration`, user/password `migration`/
 ### 2. Tests
 
 ```bash
-mvn test
+# En Windows (CMD / PowerShell):
+.\mvnw.cmd test
+
+# En Linux / macOS:
+./mvnw test
 ```
 
 ### 3. Correr un job
 
 ```bash
-mvn spring-boot:run -Dspring-boot.run.arguments="--spring.batch.job.enabled=true --spring.batch.job.name=dailyTransactionsJob"
+# En Windows (CMD / PowerShell):
+.\mvnw.cmd spring-boot:run -D"spring-boot.run.arguments=--spring.batch.job.enabled=true --spring.batch.job.name=dailyTransactionsJob"
+.\mvnw.cmd spring-boot:run -D"spring-boot.run.arguments=--spring.batch.job.enabled=true --spring.batch.job.name=monthlyInterestsJob"
+.\mvnw.cmd spring-boot:run -D"spring-boot.run.arguments=--spring.batch.job.enabled=true --spring.batch.job.name=annualGenerationJob"
 
-mvn spring-boot:run -Dspring-boot.run.arguments="--spring.batch.job.enabled=true --spring.batch.job.name=monthlyInterestsJob"
-
-mvn spring-boot:run -Dspring-boot.run.arguments="--spring.batch.job.enabled=true --spring.batch.job.name=annualGenerationJob"
+# En Linux / macOS:
+./mvnw spring-boot:run -Dspring-boot.run.arguments="--spring.batch.job.enabled=true --spring.batch.job.name=dailyTransactionsJob"
+./mvnw spring-boot:run -Dspring-boot.run.arguments="--spring.batch.job.enabled=true --spring.batch.job.name=monthlyInterestsJob"
+./mvnw spring-boot:run -Dspring-boot.run.arguments="--spring.batch.job.enabled=true --spring.batch.job.name=annualGenerationJob"
 ```
 
 Por defecto `spring.batch.job.enabled=false`.
@@ -130,7 +146,11 @@ Consultas adicionales en [docs/mysql.md](docs/mysql.md).
 ## Revertir y volver a migrar
 
 ```bash
+# En Linux / macOS / CMD:
 docker compose exec -T mysql mysql -umigration -pmigration xyz_bank_migration < scripts/revert-migration.sql
+
+# En Windows (PowerShell):
+Get-Content scripts\revert-migration.sql | docker compose exec -T mysql mysql -umigration -pmigration xyz_bank_migration
 ```
 
 Luego vuelve a ejecutar el job deseado. El script limpia tablas de negocio, `migration_executions` y metadatos `BATCH_*`.
