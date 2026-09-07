@@ -1,5 +1,6 @@
 package com.xyzbank.migration.config;
 
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.security.config.Customizer;
@@ -14,6 +15,19 @@ import org.springframework.security.web.SecurityFilterChain;
 @Configuration
 @EnableWebSecurity
 public class SecurityConfig {
+
+    private final String atmPassword;
+    private final String mobilePassword;
+    private final String webPassword;
+
+    public SecurityConfig(
+            @Value("${app.security.atm.password}") String atmPassword,
+            @Value("${app.security.mobile.password}") String mobilePassword,
+            @Value("${app.security.web.password}") String webPassword) {
+        this.atmPassword = atmPassword;
+        this.mobilePassword = mobilePassword;
+        this.webPassword = webPassword;
+    }
 
     @Bean
     public SecurityFilterChain securityFilterChain(HttpSecurity http) throws Exception {
@@ -33,17 +47,17 @@ public class SecurityConfig {
     public UserDetailsService userDetailsService() {
         UserDetails atmUser = User.builder()
                 .username("atm")
-                .password("{noop}atm")
+                .password("{noop}" + atmPassword)
                 .roles("ATM")
                 .build();
         UserDetails webUser = User.builder()
                 .username("web")
-                .password("{noop}web")
+                .password("{noop}" + webPassword)
                 .roles("WEB")
                 .build();
         UserDetails mobileUser = User.builder()
                 .username("mobile")
-                .password("{noop}mobile")
+                .password("{noop}" + mobilePassword)
                 .roles("MOBILE")
                 .build();
         return new InMemoryUserDetailsManager(atmUser, webUser, mobileUser);

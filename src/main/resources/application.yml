@@ -34,3 +34,12 @@ logging:
     root: INFO
     com.xyzbank.migration: INFO
     org.springframework.batch: INFO
+
+app:
+  security:
+    atm:
+      password: ${ATM_PASSWORD:atm}
+    mobile:
+      password: ${MOBILE_PASSWORD:mobile}
+    web:
+      password: ${WEB_PASSWORD:web}

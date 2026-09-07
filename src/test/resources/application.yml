@@ -27,3 +27,12 @@ migration:
     throttle-limit: 1
     skip-limit: 100
     retry-limit: 3
+
+app:
+  security:
+    atm:
+      password: ${ATM_PASSWORD:atm}
+    mobile:
+      password: ${MOBILE_PASSWORD:mobile}
+    web:
+      password: ${WEB_PASSWORD:web}
