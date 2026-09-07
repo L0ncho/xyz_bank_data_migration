@@ -39,6 +39,8 @@ src/main/java/com/xyzbank/migration/
 └── annualreports/ ...          AnnualAuditWriter → JdbcAnnualAuditWriter
 ```
 
+Los canales HTTP (BFF) viven en una capa Spring clásica al lado del hexágono (`controller/`, `service/`, `dto/`, `config/`). Ver [BFF y Seguridad](#bff-y-seguridad).
+
 ## Jobs (resumen)
 
 | Job | Guard | Process | Tabla MySQL |
@@ -48,6 +50,32 @@ src/main/java/com/xyzbank/migration/
 | `annualGenerationJob` | `checkAnnualMigrationNotDone` | `compileAnnualAudit` | `annual_audit_reports` |
 
 Si el job ya tiene `SUCCESS` en `migration_executions`, se omite el process (`ALREADY_MIGRATED`). Cada lanzamiento usa `RunIdIncrementer` para crear una nueva instancia Batch y consultar el ledger. Detalle en [docs/jobs.md](docs/jobs.md).
+
+## BFF y Seguridad
+
+Tres canales HTTP exponen los saldos migrados a interfaces distintas. Los controladores no reimplementan el dominio Batch: leen el mismo modelo `AccountBalance` (origen: job `monthlyInterestsJob` / tabla `account_balances`) a través de `AccountBalanceService`. Cada canal tiene su propio DTO para no filtrar más datos de los que el canal necesita.
+
+| Canal | Endpoint | Rol | DTO |
+|---|---|---|---|
+| ATM | `GET /api/atm/v1/accounts/{accountId}/balance` | `ROLE_ATM` | `accountId`, `balance` |
+| Mobile | `GET /api/mobile/v1/accounts/{accountId}/summary` | `ROLE_MOBILE` | `accountId`, `name`, `finalBalance`, `type` |
+| Web | `GET /api/web/v1/accounts/{accountId}/details` | `ROLE_WEB` | `accountId`, `name`, `finalBalance`, `type` |
+
+Autenticación: **HTTP Basic**. CSRF desactivado (API). Usuarios en memoria (`InMemoryUserDetailsManager`, contraseñas `{noop}` para entorno local):
+
+| Usuario | Contraseña | Rol |
+|---|---|---|
+| `atm` | `atm` | `ROLE_ATM` |
+| `mobile` | `mobile` | `ROLE_MOBILE` |
+| `web` | `web` | `ROLE_WEB` |
+
+Las rutas `/api/atm/**`, `/api/mobile/**` y `/api/web/**` exigen el rol del canal. Sin credenciales → **401**. Rol incorrecto → **403**. Cuenta inexistente → **404** con `{"error": "Account with id {id} not found"}` (`GlobalExceptionHandler`).
+
+Ejemplo (PowerShell):
+
+```bash
+curl.exe -u web:web http://localhost:8080/api/web/v1/accounts/101/details
+```
 
 ## Escalado y resiliencia
 

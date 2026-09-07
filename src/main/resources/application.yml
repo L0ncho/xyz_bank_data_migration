@@ -9,6 +9,9 @@ spring:
   sql:
     init:
       mode: never
+  jpa:
+    hibernate:
+      ddl-auto: none
   batch:
     jdbc:
       initialize-schema: always

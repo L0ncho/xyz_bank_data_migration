@@ -1,0 +1,17 @@
+[33m766bc6c[m[33m ([m[1;36mHEAD[m[33m -> [m[1;32mdev[m[33m, [m[1;31morigin/dev[m[33m)[m HEAD@{0}: pull origin dev: Fast-forward
+[33ma593667[m HEAD@{1}: pull origin dev --no-rebase: Merge made by the 'ort' strategy.
+[33maa3f9a7[m HEAD@{2}: merge revision-pr-companero: Merge made by the 'ort' strategy.
+[33m2dc3705[m HEAD@{3}: pull origin main: Merge made by the 'ort' strategy.
+[33m5e30213[m HEAD@{4}: checkout: moving from revision-pr-companero to dev
+[33m1e38822[m[33m ([m[1;32mrevision-pr-companero[m[33m)[m HEAD@{5}: commit: feat: mejoras de normalizacion CSV, retry listener y README
+[33m35e3fb7[m HEAD@{6}: checkout: moving from dev to revision-pr-companero
+[33m5e30213[m HEAD@{7}: checkout: moving from dev to dev
+[33m5e30213[m HEAD@{8}: pull: Merge made by the 'ort' strategy.
+[33m20228e0[m HEAD@{9}: pull origin main: Fast-forward
+[33mdb47a0f[m HEAD@{10}: commit: Flag: Documentos de Entrega
+[33me1741c0[m HEAD@{11}: commit: chore: add maven wrapper files and remove local docker override
+[33mb04569d[m HEAD@{12}: commit: docs: Update README with Maven Wrapper instructions and prerequisites
+[33m583b5ee[m[33m ([m[1;32mmain[m[33m)[m HEAD@{13}: checkout: moving from main to dev
+[33m583b5ee[m[33m ([m[1;32mmain[m[33m)[m HEAD@{14}: pull origin main: Fast-forward
+[33m2606f26[m HEAD@{15}: checkout: moving from main to main
+[33m2606f26[m HEAD@{16}: clone: from https://github.com/L0ncho/xyz_bank_data_migration.git

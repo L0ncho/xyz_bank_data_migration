@@ -8,6 +8,9 @@ spring:
     init:
       mode: always
       schema-locations: classpath:db/schema.sql
+  jpa:
+    hibernate:
+      ddl-auto: none
   batch:
     jdbc:
       initialize-schema: always
